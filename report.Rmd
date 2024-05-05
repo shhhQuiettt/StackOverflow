@@ -1,0 +1,185 @@
+# Preparing data
+
+
+```{r}
+# res2023[1,]
+
+
+education_order <- c(
+    "I never completed any formal education",
+    "Something else",
+    "Primary/elementary school",
+    "Secondary school",
+    "Associate degree",
+    "Some college/university study without earning a degree",
+    "Bachelor’s degree",
+    "Master’s degree",
+    "Professional degree"
+)
+
+
+library("plotly")
+library("dplyr")
+library("tidyr")
+library("stringr")
+library("ggplot2")
+
+
+
+res2018raw <- read.csv("./developer_surveys/survey_results_2018.csv", sep = ",", header = TRUE)
+
+# convert salary to numeric
+
+
+
+
+
+
+
+res2018 <- res2018raw %>%
+    select(FormalEducation, DevType, Salary = ConvertedSalary, SalaryType, Experience = YearsCoding, AdmiredLanguage = LanguageDesireNextYear) %>%
+    mutate(Salary = as.numeric(Salary)) %>%
+    select(-SalaryType) %>%
+    filter(!is.na(Salary) & Salary != 0) %>%
+    mutate(Education = str_trim(str_extract(FormalEducation, "^[^(]+"))) %>%
+    mutate(Education = ifelse(Education == "Other doctoral degree", "Professional degree", Education)) %>%
+    mutate(Education = factor(Education, ordered = TRUE, levels = education_order))
+
+count(res2018)
+
+
+
+res2023raw <- read.csv("./developer_surveys/survey_results_2023.csv", sep = ",", header = TRUE)
+
+res2023 <- res2023raw %>%
+    select(EdLevel, DevType, Salary = ConvertedCompYearly, Experience = YearsCode) %>%
+    mutate(Education = str_trim(str_extract(EdLevel, "^[^(]+"))) %>%
+    mutate(Education = factor(Education, ordered = TRUE, levels = education_order))
+```
+# How income is distributed based on education and type
+
+```{r}
+education_devtype_salary <- res2018 %>%
+    filter(!is.na(DevType) & !is.na(Education)) %>%
+    filter(Education != "I never completed any formal education") %>%
+    separate_rows(DevType, sep = ";") %>%
+    group_by(Education, DevType) %>%
+    summarize(MedSalary = median(Salary))
+
+
+g <- ggplot(data = education_devtype_salary, aes(x = Education, y = MedSalary, group = DevType, color = DevType)) +
+    geom_line() +
+    scale_fill_brewer(palette = "Blues")
+
+ggplotly(g)
+```
+
+
+# How experience vs salary
+## Bar (x - experience) y(salary)
+
+```{r}
+experience_levels <- c(
+    "0-2", "3-5", "6-8", "9-11",
+    "12-14", "15-17", "18-20", "21-23",
+    "24-26", "27-29", "30 or more"
+)
+
+
+discretize_experience <- function(experience) {
+    experience <- as.numeric(experience)
+    return(case_when(
+        experience >= 0 & experience <= 2 ~ "0-2",
+        experience >= 3 & experience <= 5 ~ "3-5",
+        experience >= 6 & experience <= 8 ~ "6-8",
+        experience >= 9 & experience <= 11 ~ "9-11",
+        experience >= 12 & experience <= 14 ~ "12-14",
+        experience >= 15 & experience <= 17 ~ "15-17",
+        experience >= 18 & experience <= 20 ~ "18-20",
+        experience >= 21 & experience <= 23 ~ "21-23",
+        experience >= 24 & experience <= 26 ~ "24-26",
+        experience >= 27 & experience <= 29 ~ "27-29",
+        TRUE ~ "30 or more"
+    ))
+}
+
+
+exp_sal18 <- res2018 %>%
+    select(Experience, Salary) %>%
+    na.omit() %>%
+    mutate(Experience = gsub(" years", "", Experience)) %>%
+    mutate(Experience = factor(Experience, levels = experience_levels, ordered = TRUE)) %>%
+    group_by(Experience) %>%
+    summarize(MedSalary = median(Salary)) %>%
+    mutate(year = "2018")
+exp_sal18
+
+exp_sal23 <- res2023 %>%
+    select(Experience, Salary) %>%
+    na.omit() %>%
+    mutate(Experience = discretize_experience(Experience)) %>%
+    mutate(Experience = factor(Experience, levels = experience_levels, ordered = TRUE)) %>%
+    group_by(Experience) %>%
+    summarize(MedSalary = median(Salary)) %>%
+    mutate(year = "2023")
+exp_sal23
+
+
+exp_sal <- union(exp_sal18, exp_sal23)
+exp_sal
+
+## con
+
+ggplot(exp_sal, aes(x = Experience, y = MedSalary, fill = year, color = year)) +
+    geom_bar(stat = "identity", position = position_dodge(), width = 0.45)
+# facet_wrap(~year)
+```
+
+
+## Inflation plot
+
+## With inflation
+
+# Are admired languages well paid
+```{r}
+admired18 <- res2018 %>%
+    select(AdmiredLanguage, Salary) %>%
+    separate_rows(AdmiredLanguage, sep = ";") %>%
+    group_by(AdmiredLanguage) %>%
+    summarize(SalaryMed = median(Salary), AdmiredLanguageCount = n())
+
+g <- ggplot(admired18, aes(x = AdmiredLanguageCount, y = SalaryMed, color = AdmiredLanguage, fill = AdmiredLanguage)) +
+    geom_jitter()
+
+ggplotly(g)
+```
+
+
+## Admired salary - language
+
+# Is it better to work in big companies?
+## Subplots x age_bin, and comparison of salaries per company size
+## Are differences statistically significant?
+
+# Where to work?
+## Map of the world with colored salaries
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
