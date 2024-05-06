@@ -1,90 +1,47 @@
-# Preparing data
+![](./put.png)
 
+---
+    title: "StackOverflow 2018 and 2023 Survey Analysis"
+    author: "Krzysztof Skrobała 156039, Wojciech Bogacz 156034"
+    date: "5/5/2023"
+    output: html_document
+---
 
-```{r}
-# res2023[1,]
+# Introduction
 
+In this report we will analyze the StackOverflow 2018 and 2023 Survey data. We put our focus on comparisons of different aspects of programmer's life with respect to salary. In particular, we will explore 
 
-education_order <- c(
-    "I never completed any formal education",
-    "Something else",
-    "Primary/elementary school",
-    "Secondary school",
-    "Associate degree",
-    "Some college/university study without earning a degree",
-    "Bachelor’s degree",
-    "Master’s degree",
-    "Professional degree"
-)
-
-
+```{r, echo=FALSE, cache=TRUE}
 library("plotly")
 library("dplyr")
 library("tidyr")
 library("stringr")
 library("ggplot2")
 
-
-
 res2018raw <- read.csv("./developer_surveys/survey_results_2018.csv", sep = ",", header = TRUE)
-
-# convert salary to numeric
-
-
-
-
-
-
-
 res2018 <- res2018raw %>%
-    select(FormalEducation, DevType, Salary = ConvertedSalary, SalaryType, Experience = YearsCoding, AdmiredLanguage = LanguageDesireNextYear) %>%
+    select(DevType, Salary = ConvertedSalary, Experience = YearsCodingProf, AdmiredLanguage = LanguageDesireNextYear, CompanySize) %>%
     mutate(Salary = as.numeric(Salary)) %>%
-    select(-SalaryType) %>%
-    filter(!is.na(Salary) & Salary != 0) %>%
-    mutate(Education = str_trim(str_extract(FormalEducation, "^[^(]+"))) %>%
-    mutate(Education = ifelse(Education == "Other doctoral degree", "Professional degree", Education)) %>%
-    mutate(Education = factor(Education, ordered = TRUE, levels = education_order))
-
-count(res2018)
-
-
+    filter(!is.na(Salary) & Salary != 0)
 
 res2023raw <- read.csv("./developer_surveys/survey_results_2023.csv", sep = ",", header = TRUE)
-
 res2023 <- res2023raw %>%
-    select(EdLevel, DevType, Salary = ConvertedCompYearly, Experience = YearsCode) %>%
-    mutate(Education = str_trim(str_extract(EdLevel, "^[^(]+"))) %>%
-    mutate(Education = factor(Education, ordered = TRUE, levels = education_order))
-```
-# How income is distributed based on education and type
-
-```{r}
-education_devtype_salary <- res2018 %>%
-    filter(!is.na(DevType) & !is.na(Education)) %>%
-    filter(Education != "I never completed any formal education") %>%
-    separate_rows(DevType, sep = ";") %>%
-    group_by(Education, DevType) %>%
-    summarize(MedSalary = median(Salary))
-
-
-g <- ggplot(data = education_devtype_salary, aes(x = Education, y = MedSalary, group = DevType, color = DevType)) +
-    geom_line() +
-    scale_fill_brewer(palette = "Blues")
-
-ggplotly(g)
+    select(DevType, Salary = ConvertedCompYearly, Experience = YearsCodePro, CompanySize = OrgSize, Country)
 ```
 
+# Median salary distribution on level of experience
 
-# How experience vs salary
-## Bar (x - experience) y(salary)
+In this section we will compare the distribution of salaries in 2018 and 2023 and ask an important question: do programmers earn more in 2023 than in 2018?
 
-```{r}
+## Comparison of the distribution in 2018 and 2023
+
+First, we investigate how salary changed over the six years:
+```{r, echo=FALSE, warning=FALSE, cache=TRUE}
 experience_levels <- c(
     "0-2", "3-5", "6-8", "9-11",
     "12-14", "15-17", "18-20", "21-23",
     "24-26", "27-29", "30 or more"
 )
-
 
 discretize_experience <- function(experience) {
     experience <- as.numeric(experience)
@@ -103,7 +60,6 @@ discretize_experience <- function(experience) {
     ))
 }
 
-
 exp_sal18 <- res2018 %>%
     select(Experience, Salary) %>%
     na.omit() %>%
@@ -112,7 +68,6 @@ exp_sal18 <- res2018 %>%
     group_by(Experience) %>%
     summarize(MedSalary = median(Salary)) %>%
     mutate(year = "2018")
-exp_sal18
 
 exp_sal23 <- res2023 %>%
     select(Experience, Salary) %>%
@@ -122,26 +77,97 @@ exp_sal23 <- res2023 %>%
     group_by(Experience) %>%
     summarize(MedSalary = median(Salary)) %>%
     mutate(year = "2023")
-exp_sal23
-
 
 exp_sal <- union(exp_sal18, exp_sal23)
-exp_sal
 
-## con
+g <- ggplot(exp_sal, aes(x = Experience, y = MedSalary, fill = year)) +
+    geom_bar(stat = "identity", position = position_dodge(), width = 0.45) +
+    labs(
+        fill = "Year",
+        title = "Salary Accross Professional Experience",
+        x = "Years of professional coding",
+        y = "Median Salary"
+    ) +
+    ggtitle(
+        "Median salary accross experience level"
+    )
+ggplotly(g)
+```
+Apart from the obvious fact that salary increases with the experience, we observe and interesting decline in more experienced professionalist. 
 
-ggplot(exp_sal, aes(x = Experience, y = MedSalary, fill = year, color = year)) +
-    geom_bar(stat = "identity", position = position_dodge(), width = 0.45)
-# facet_wrap(~year)
+## Inflation between 2018 and 2023
+Comparing salaries in 5 years period we cannot forget about inflation. As salaries have been converted to USD by the StackOverflow at the time, we can take only dollar's inflation into the account
+
+
+```{r, echo=FALSE}
+usd_inflation <- data.frame(
+    Year = c(2018, 2019, 2020, 2021, 2022, 2023),
+    Inflation = c(2.44, 1.81, 1.23, 4.70, 8.00, 4.10) / 100
+)
+
+ggplot(usd_inflation, aes(x = Year, y = Inflation)) +
+    geom_smooth() +
+    geom_point() +
+    scale_y_continuous(
+        labels = scales::percent,
+        breaks = seq(0, 0.08, 0.005)
+    ) +
+    ggtitle("Inflation Between 2018 And 2023", )
+
+total_inflation <- prod(1 + usd_inflation$Inflation) - 1
 ```
 
 
-## Inflation plot
+It's important to remark that we  the the conversion rates between currencies do not depend _only_ Inflation. 
 
-## With inflation
 
-# Are admired languages well paid
-```{r}
+## Do programmers earn more in 2023 than in 2018?
+
+After consideration we may wonder how the changes relate to the inflation.
+
+The total cumulative inflation betwen 2018 and 2023 was???? __`r total_inflation`__
+
+We now examine how percentage-wise changes in compensation, compare to the inflation
+
+```{r echo=FALSE}
+salary_increase <- (exp_sal23$MedSalary - exp_sal18$MedSalary) / exp_sal18$MedSalary
+
+salary_increase_df <- data.frame(
+    Experience = exp_sal23$Experience,
+    SalaryIncrease = salary_increase
+)
+salary_increase_df <- salary_increase_df %>%
+    mutate(earnsMore = case_when(
+        SalaryIncrease > total_inflation ~ "Yes",
+        total_inflation >= SalaryIncrease & SalaryIncrease >= 0 ~ "Intermediate",
+        TRUE ~ "Less"
+    ))
+
+
+g <- ggplot(salary_increase_df, aes(x = Experience, y = SalaryIncrease, fill = earnsMore)) +
+    geom_bar(stat = "identity") +
+    geom_hline(yintercept = total_inflation, color = "black", linetype = "dashed") +
+    annotate("text", x = 8, y = total_inflation + 0.03, label = "Total inflation between 2018 and 2023", color = "black", size = 4) +
+    scale_y_continuous(labels = scales::percent, limit = c(-0.5, 0.5), breaks = sort(c(seq(-0.5, 0.5, 0.1), total_inflation))) +
+    scale_fill_manual(values = c("Yes" = "#8de800", "Intermediate" = "orange", "Less" = "red")) +
+    labs(
+        title = "Changes In Salary Vetween 2018 And 2023",
+        subtitle = "And inflation rate",
+        x = "Experience level",
+        y = "Change in salary"
+    ) +
+    guides(fill = FALSE)
+g
+```
+
+As we can see, even though the nominal salary increased in for developers up to 23 years of experience, the only group that earns more after these 5 years are new developers. 
+
+# Admired languages and salary
+
+Now we will examine, if languages that are especially liked by programmers, bring them more income
+
+
+```{r, fig.width=9, fig.height=10, echo=FALSE, warning = FALSE}
 admired18 <- res2018 %>%
     select(AdmiredLanguage, Salary) %>%
     separate_rows(AdmiredLanguage, sep = ";") %>%
@@ -149,37 +175,35 @@ admired18 <- res2018 %>%
     summarize(SalaryMed = median(Salary), AdmiredLanguageCount = n())
 
 g <- ggplot(admired18, aes(x = AdmiredLanguageCount, y = SalaryMed, color = AdmiredLanguage, fill = AdmiredLanguage)) +
-    geom_jitter()
-
-ggplotly(g)
+    geom_jitter(show.legend = FALSE) +
+    geom_text(
+        aes(label = AdmiredLanguage),
+        vjust = case_when(
+            admired18$AdmiredLanguage == "Python" ~ 1.5,
+            admired18$AdmiredLanguage == "CSS" ~ 1.8,
+            admired18$AdmiredLanguage == "Visual Basic 6" ~ 1,
+            admired18$AdmiredLanguage == "C++" ~ 1,
+            admired18$AdmiredLanguage == "Perl" ~ 1,
+            TRUE ~ -0.5
+        ),
+        hjust = ifelse(admired18$AdmiredLanguage == "JavaScript", 1, -0.2),
+        show.legend = FALSE
+    ) +
+    theme(legend.position = "none") +
+    labs(
+        title = "Sentiment to Salary of Languages Comparison",
+        x = "Number of programmers, which want to work with the language",
+        y = "Median Salary"
+    )
+g
 ```
+As we can see we obtain a triangular shape. Langugages, which developers want to use the most, are in the middle of salaries. 
 
-
-## Admired salary - language
-
-# Is it better to work in big companies?
-## Subplots x age_bin, and comparison of salaries per company size
-## Are differences statistically significant?
-
-# Where to work?
-## Map of the world with colored salaries
+On the other hand the less desired languages spread accros the salary ax. On the one hand, systems that use egsotic???? and unpleasent languages, will pay moreto attract employees, and on the other hand ...
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#  
 
 
 
