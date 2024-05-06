@@ -123,8 +123,7 @@ usd_inflation <- data.frame(
 
 g <- ggplot(usd_inflation, aes(x = Year, y = Inflation)) +
     geom_smooth() +
-    geom_point() +
-ggplotly(g)
+    geom_point()
 
 total_inflation <- prod(1 + usd_inflation$Inflation / 100)
 
@@ -244,7 +243,12 @@ ggplot(company_salary23, aes(x = CompanySize, y = SalaryMed, fill = CompanySize)
 
 # Wher to work?
 ## Map of the world with colored salaries
-```{r}
+
+# Best paying countries
+
+Of course salary depends greatly on the country you work with. 
+
+```{r world_map, echo=FALSE}
 convert_country <- function(country) {
     return(case_when(
         country == "Antigua and Barbuda" ~ "Antigua",
@@ -273,19 +277,6 @@ map_data23 <- res2023 %>%
     group_by(Country) %>%
     summarize(SalaryMed = median(Salary))
 
-
-a1 <- WorldData %>%
-    select(region) %>%
-    distinct()
-a2 <- map_data23 %>%
-    select(region = Country) %>%
-    distinct()
-
-
-
-setdiff(a2, a1)
-setdiff(a1, a2)
-
 WorldData <- map_data("world") %>%
     filter(region != "Antarctica") %>%
     fortify()
@@ -309,4 +300,5 @@ p <- ggplot() +
     theme_bw()
 p
 ```
+As shown above, the countries which stand out are USA, switzerland and Australia
 

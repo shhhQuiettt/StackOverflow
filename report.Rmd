@@ -11,7 +11,7 @@
 
 In this report we will analyze the StackOverflow 2018 and 2023 Survey data. We put our focus on comparisons of different aspects of programmer's life with respect to salary. In particular, we will explore 
 
-```{r, echo=FALSE, cache=TRUE}
+```{r setup, echo=FALSE, cache=TRUE}
 library("plotly")
 library("dplyr")
 library("tidyr")
@@ -36,7 +36,7 @@ In this section we will compare the distribution of salaries in 2018 and 2023 an
 ## Comparison of the distribution in 2018 and 2023
 
 First, we investigate how salary changed over the six years:
-```{r, echo=FALSE, warning=FALSE, cache=TRUE}
+```{r, echo=FALSE, warning=FALSE, cache=FALSE, fig.width=10,fig.fullwidth=TRUE}
 experience_levels <- c(
     "0-2", "3-5", "6-8", "9-11",
     "12-14", "15-17", "18-20", "21-23",
@@ -147,12 +147,12 @@ salary_increase_df <- salary_increase_df %>%
 g <- ggplot(salary_increase_df, aes(x = Experience, y = SalaryIncrease, fill = earnsMore)) +
     geom_bar(stat = "identity") +
     geom_hline(yintercept = total_inflation, color = "black", linetype = "dashed") +
-    annotate("text", x = 8, y = total_inflation + 0.03, label = "Total inflation between 2018 and 2023", color = "black", size = 4) +
+    annotate("text", x = 8, y = total_inflation + 0.03, label = "Cumulative inflation between 2018 and 2023", color = "black", size = 4) +
     scale_y_continuous(labels = scales::percent, limit = c(-0.5, 0.5), breaks = sort(c(seq(-0.5, 0.5, 0.1), total_inflation))) +
     scale_fill_manual(values = c("Yes" = "#8de800", "Intermediate" = "orange", "Less" = "red")) +
     labs(
         title = "Changes In Salary Vetween 2018 And 2023",
-        subtitle = "And inflation rate",
+        subtitle = "In comparison to the inflation rate",
         x = "Experience level",
         y = "Change in salary"
     ) +
@@ -167,7 +167,7 @@ As we can see, even though the nominal salary increased in for developers up to 
 Now we will examine, if languages that are especially liked by programmers, bring them more income
 
 
-```{r, fig.width=9, fig.height=10, echo=FALSE, warning = FALSE}
+```{r, fig.width=10, fig.fullwidth=TRUE,fig.height=10, echo=FALSE, warning = FALSE}
 admired18 <- res2018 %>%
     select(AdmiredLanguage, Salary) %>%
     separate_rows(AdmiredLanguage, sep = ";") %>%
@@ -203,7 +203,141 @@ On the other hand the less desired languages spread accros the salary ax. On the
 
 
 
-#  
+# Is it better to work in big companies?
+We wanted to examine if at different stages of professional life it is more worth it to work in small companies or big corporations.
 
+```{r, echo = FALSE,  warning=FALSE, fig.width=10, fig.height=9, fig.fullwidth=TRUE}
+company_levels <- c(
+    "Freelancer",
+    "2 to 9 employees",
+    "Fewer than 10 employees",
+    "10 to 19 employees",
+    "20 to 99 employees",
+    "100 to 499 employees",
+    "500 to 999 employees",
+    "1,000 to 4,999 employees",
+    "5,000 to 9,999 employees",
+    "10,000 or more employees"
+)
+
+company_salary18 <- res2018 %>%
+    select(
+        CompanySize, Salary, Experience
+    ) %>%
+    na.omit() %>%
+    mutate(Experience = gsub(" years", "", Experience)) %>%
+    mutate(Experience = factor(Experience, levels = experience_levels, ordered = TRUE)) %>%
+    mutate(CompanySize = factor(CompanySize, levels = company_levels, ordered = TRUE)) %>%
+    group_by(CompanySize, Experience) %>%
+    summarize(SalaryMed = median(Salary))
+
+company_salary23 <- res2023 %>%
+    select(
+        CompanySize, Salary, Experience
+    ) %>%
+    na.omit() %>%
+    filter(CompanySize != "I don’t know") %>%
+    mutate(CompanySize = ifelse(CompanySize == "Just me - I am a freelancer, sole proprietor, etc.", "Freelancer", CompanySize)) %>%
+    mutate(Experience = discretize_experience(Experience)) %>%
+    mutate(Experience = gsub(" years", "", Experience)) %>%
+    mutate(Experience = factor(Experience, levels = experience_levels, ordered = TRUE)) %>%
+    mutate(CompanySize = factor(CompanySize, levels = company_levels, ordered = TRUE)) %>%
+    group_by(CompanySize, Experience) %>%
+    summarize(SalaryMed = median(Salary))
+
+
+
+g18 <- ggplot(company_salary18, aes(x = CompanySize, y = SalaryMed, fill = CompanySize), format(y, scientific = FALSE)) +
+    geom_bar(stat = "identity") +
+    facet_wrap(~Experience) +
+    scale_y_continuous(labels = scales::comma, breaks = seq(0, 200000, 25000)) +
+    theme(
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank()
+    )
+
+g23 <- ggplot(company_salary23, aes(x = CompanySize, y = SalaryMed, fill = CompanySize), format(y, scientific = FALSE)) +
+    geom_bar(stat = "identity") +
+    facet_wrap(~Experience) +
+    scale_y_continuous(labels = scales::comma, breaks = seq(0, 200000, 25000)) +
+    theme(
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.x = element_blank()
+    ) +
+    labs(
+        title = "Salary Distribution On Company Size",
+        subtitle = "Divided By Experience Level",
+        y = "Salary Median",
+    ) +
+    scale_fill_brewer(
+        palette = "Paired"
+    )
+
+g23
+```
+Interestingly, it seems that working in big giants is always most profitable. On the other hand, the more experience you have the more plot buldge around 500-999 employees. 
+
+# 
+
+# Best paying countries
+
+Of course salary depends greatly on the country you work with. 
+
+```{r world_map, echo=FALSE, fig.width=10, fig.fullwidth=TRUE}
+convert_country <- function(country) {
+    return(case_when(
+        country == "Antigua and Barbuda" ~ "Antigua",
+        country == "Brunei Darussalam" ~ "Brunei",
+        country == "Côte d'Ivoire" ~ "Ivory Coast",
+        country == "Iran, Islamic Republic of..." ~ "Iran",
+        country == "Lao People's Democratic Republic" ~ "Laos",
+        country == "Libyan Arab Jamahiriya" ~ "Libya",
+        country == "Republic of Moldova" ~ "Moldova",
+        country == "Russian Federation" ~ "Russia",
+        country == "Syrian Arab Republic" ~ "Syria",
+        country == "The former Yugoslav Republic of Macedonia" ~ "North Macedonia",
+        country == "United Kingdom of Great Britain and Northern Ireland" ~ "UK",
+        country == "United Republic of Tanzania" ~ "Tanzania",
+        country == "United States of America" ~ "USA",
+        country == "Venezuela, Bolivarian Republic of ..." ~ "Venezuela",
+        country == "Viet Nam" ~ "Vietnam",
+        TRUE ~ country
+    ))
+}
+
+map_data23 <- res2023 %>%
+    select(Country, Salary) %>%
+    mutate(Country = convert_country(Country)) %>%
+    na.omit() %>%
+    group_by(Country) %>%
+    summarize(SalaryMed = median(Salary))
+
+world_data <- map_data("world") %>%
+    filter(region != "Antarctica") %>%
+    fortify()
+
+p <- ggplot() +
+    geom_map(
+        data = world_data, map = world_data,
+        aes(x = long, y = lat, group = group, map_id = region),
+        fill = "white", colour = "#7f7f7f", size = 0.5
+    ) +
+    geom_map(
+        data = map_data23, map = world_data,
+        aes(fill = SalaryMed, map_id = Country),
+        colour = "#7f7f7f", size = 0.5
+    ) +
+    coord_map("rectangular", lat0 = 0, xlim = c(-180, 180), ylim = c(-60, 90)) +
+    scale_fill_continuous(low = "thistle2", high = "darkred", guide = "colorbar") +
+    scale_y_continuous(breaks = c()) +
+    scale_x_continuous(breaks = c()) +
+    labs(fill = "Median Salary", title = "Salary in different countries", x = "", y = "") +
+    theme_bw() +
+    theme(panel.border = element_blank())
+
+p
+```
+As shown above, the countries which stand out are USA, Switzerland and Australia
 
 
