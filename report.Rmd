@@ -1,22 +1,25 @@
 ![](./put.png)
 
 ---
-    title: "StackOverflow 2018 and 2023 Survey Analysis"
-    author: "Krzysztof Skrobała 156039, Wojciech Bogacz 156034"
-    date: "5/5/2023"
-    output: html_document
+title: "StackOverflow 2018 and 2023 Survey Analysis"
+author: "Krzysztof Skrobała 156039, Wojciech Bogacz 156034"
+date: "5/5/2023"
+output: html_document
 ---
 
 # Introduction
 
-In this report we will analyze the StackOverflow 2018 and 2023 Survey data. We put our focus on comparisons of different aspects of programmer's life with respect to salary. In particular, we will explore 
+This report embarks on a journey through the intricacies of developer compensation, comparing and contrasting findings from the StackOverflow surveys of 2022 and 2023. Our aim is to provide a comprehensive analysis that sheds light on the nuances of salary trends across various dimensions, offering valuable insights for both employers and developers alike.
 
-```{r setup, echo=FALSE, cache=TRUE}
+```{r setup, echo=FALSE, cache=FALSE, message=FALSE}
 library("plotly")
 library("dplyr")
 library("tidyr")
+library("magrittr")
 library("stringr")
 library("ggplot2")
+library("maps")
+library("mapproj")
 
 res2018raw <- read.csv("./developer_surveys/survey_results_2018.csv", sep = ",", header = TRUE)
 res2018 <- res2018raw %>%
@@ -35,8 +38,9 @@ In this section we will compare the distribution of salaries in 2018 and 2023 an
 
 ## Comparison of the distribution in 2018 and 2023
 
-First, we investigate how salary changed over the six years:
-```{r, echo=FALSE, warning=FALSE, cache=FALSE, fig.width=10,fig.fullwidth=TRUE}
+First, we investigate how salary changed over the six years.
+
+```{r, echo=FALSE, warning=FALSE,  message=FALSE, cache=FALSE, fig.width=10,fig.fullwidth=TRUE}
 experience_levels <- c(
     "0-2", "3-5", "6-8", "9-11",
     "12-14", "15-17", "18-20", "21-23",
@@ -93,13 +97,14 @@ g <- ggplot(exp_sal, aes(x = Experience, y = MedSalary, fill = year)) +
     )
 ggplotly(g)
 ```
-Apart from the obvious fact that salary increases with the experience, we observe and interesting decline in more experienced professionalist. 
+
+Apart from the obvious fact that salary increases with the experience, we observe and an interesting decline in more experienced professionalists in 2023 with respect to 2018. This unusual situation need further analysis to explain this phenomen.
 
 ## Inflation between 2018 and 2023
+
 Comparing salaries in 5 years period we cannot forget about inflation. As salaries have been converted to USD by the StackOverflow at the time, we can take only dollar's inflation into the account
 
-
-```{r, echo=FALSE}
+```{r, echo=FALSE, warning=FALSE, message=FALSE, fig.width=10,fig.fullwidth=TRUE}
 usd_inflation <- data.frame(
     Year = c(2018, 2019, 2020, 2021, 2022, 2023),
     Inflation = c(2.44, 1.81, 1.23, 4.70, 8.00, 4.10) / 100
@@ -117,19 +122,17 @@ ggplot(usd_inflation, aes(x = Year, y = Inflation)) +
 total_inflation <- prod(1 + usd_inflation$Inflation) - 1
 ```
 
-
-It's important to remark that we  the the conversion rates between currencies do not depend _only_ Inflation. 
-
+It's important to remark that we the conversion rates between currencies do not depend *only* Inflation.
 
 ## Do programmers earn more in 2023 than in 2018?
 
 After consideration we may wonder how the changes relate to the inflation.
 
-The total cumulative inflation betwen 2018 and 2023 was???? __`r total_inflation`__
+The total cumulative inflation between 2018 and 2023 was: **`r round(total_inflation * 100,1)`%**
 
-We now examine how percentage-wise changes in compensation, compare to the inflation
+We now examine how percentage-wise changes in compensation, compare to the inflation.
 
-```{r echo=FALSE}
+```{r echo=FALSE, warning=FALSE, error=FALSE, message=FALSE, fig.width=10,fig.fullwidth=TRUE}
 salary_increase <- (exp_sal23$MedSalary - exp_sal18$MedSalary) / exp_sal18$MedSalary
 
 salary_increase_df <- data.frame(
@@ -157,17 +160,16 @@ g <- ggplot(salary_increase_df, aes(x = Experience, y = SalaryIncrease, fill = e
         y = "Change in salary"
     ) +
     guides(fill = FALSE)
-g
+ggplotly(g)
 ```
 
-As we can see, even though the nominal salary increased in for developers up to 23 years of experience, the only group that earns more after these 5 years are new developers. 
+As we can see, even though the nominal salary increased in for developers up to 23 years of experience, the only group that earns more after these 5 years are new developers.
 
 # Admired languages and salary
 
-Now we will examine, if languages that are especially liked by programmers, bring them more income
+Now we will examine, if languages that are especially liked by programmers, bring them more income.
 
-
-```{r, fig.width=10, fig.fullwidth=TRUE,fig.height=10, echo=FALSE, warning = FALSE}
+```{r, fig.width=10, fig.fullwidth=TRUE, fig.height=10, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 admired18 <- res2018 %>%
     select(AdmiredLanguage, Salary) %>%
     separate_rows(AdmiredLanguage, sep = ";") %>%
@@ -197,16 +199,14 @@ g <- ggplot(admired18, aes(x = AdmiredLanguageCount, y = SalaryMed, color = Admi
     )
 g
 ```
-As we can see we obtain a triangular shape. Langugages, which developers want to use the most, are in the middle of salaries. 
 
-On the other hand the less desired languages spread accros the salary ax. On the one hand, systems that use egsotic???? and unpleasent languages, will pay moreto attract employees, and on the other hand ...
-
-
+As we can see we obtain a triangular shape. Languages, which developers want to use the most, are in the middle of salaries. In this graph we can see also market laws, because for less desired languages, market pays more. However,  choosing 
 
 # Is it better to work in big companies?
-We wanted to examine if at different stages of professional life it is more worth it to work in small companies or big corporations.
 
-```{r, echo = FALSE,  warning=FALSE, fig.width=10, fig.height=9, fig.fullwidth=TRUE}
+We wanted to examine if at different stages of professional life is it more worth it to work in small companies or big corporations?
+
+```{r, echo = FALSE, warning=FALSE, error=FALSE, message=FALSE, fig.width=10, fig.height=9, fig.fullwidth=TRUE}
 company_levels <- c(
     "Freelancer",
     "2 to 9 employees",
@@ -253,7 +253,16 @@ g18 <- ggplot(company_salary18, aes(x = CompanySize, y = SalaryMed, fill = Compa
     scale_y_continuous(labels = scales::comma, breaks = seq(0, 200000, 25000)) +
     theme(
         axis.text.x = element_blank(),
-        axis.ticks.x = element_blank()
+        axis.ticks.x = element_blank(),
+        axis.title.x = element_blank()
+    ) +
+    labs(
+        title = "Salary Distribution On Company Size in 2018",
+        subtitle = "Divided By Experience Level",
+        y = "Salary Median",
+    ) +
+    scale_fill_brewer(
+        palette = "Paired"
     )
 
 g23 <- ggplot(company_salary23, aes(x = CompanySize, y = SalaryMed, fill = CompanySize), format(y, scientific = FALSE)) +
@@ -266,7 +275,7 @@ g23 <- ggplot(company_salary23, aes(x = CompanySize, y = SalaryMed, fill = Compa
         axis.title.x = element_blank()
     ) +
     labs(
-        title = "Salary Distribution On Company Size",
+        title = "Salary Distribution On Company Size in 2023",
         subtitle = "Divided By Experience Level",
         y = "Salary Median",
     ) +
@@ -274,17 +283,19 @@ g23 <- ggplot(company_salary23, aes(x = CompanySize, y = SalaryMed, fill = Compa
         palette = "Paired"
     )
 
-g23
+ggplotly(g23)
+ggplotly(g18)
 ```
-Interestingly, it seems that working in big giants is always most profitable. On the other hand, the more experience you have the more plot buldge around 500-999 employees. 
+
+Interestingly, it seems that working in big giants is always most profitable. On the other hand, the more experience you have the more plot bulge around 500-999 employees.
 
 # 
 
 # Best paying countries
 
-Of course salary depends greatly on the country you work with. 
+Of course salary depends greatly on the country you work with.
 
-```{r world_map, echo=FALSE, fig.width=10, fig.fullwidth=TRUE}
+```{r world_map, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE,fig.width=10, fig.fullwidth=TRUE}
 convert_country <- function(country) {
     return(case_when(
         country == "Antigua and Barbuda" ~ "Antigua",
@@ -338,6 +349,22 @@ p <- ggplot() +
 
 p
 ```
-As shown above, the countries which stand out are USA, Switzerland and Australia
+
+As shown above, the countries which stand out are USA, Canada, Switzerland and Australia.
+
+# Summary
+
+This report conducts a thorough examination of developer salaries, comparing findings from the StackOverflow surveys of 2022 and 2023. Through meticulous analysis, we unveil the evolving landscape of compensation in the tech industry, exploring trends, disparities, and emerging patterns across various dimensions.
+
+Key Highlights:
+
+1. **Experience Levels**: We explore the correlation between experience levels and salaries, examining how compensation varies based on years of experience and identifying trends that can inform career development strategies.
+
+2.  **Programming Languages**: Our analysis delves into the impact of programming language proficiency on salaries, revealing which languages command higher compensation and how this landscape has evolved over the years.
+
+3. **Company Size**: Our analysis delves into the impact of company size on developer salaries, revealing how compensation varies between startups, small-to-medium enterprises (SMEs), and large corporations. This comparison offers insights into the salary dynamics within different organizational structures.
+
+4. **Geographical Variances**: We uncover regional differences in developer salaries, highlighting shifts in compensation trends across different parts of the globe.
 
 
+Through this comprehensive analysis, we aim to contribute to a deeper understanding of the dynamics of developer compensation, fostering dialogue and driving positive change within the tech industry.
